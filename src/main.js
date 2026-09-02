@@ -57,11 +57,13 @@ function dashboard(s){
   <button id="practice" ${s.practice_used?"disabled":""}>${s.practice_used?"Teste já utilizado":"Fazer teste"}</button>
   <button id="valid" class="secondary" ${(s.valid_used||!s.practice_used)?"disabled":""}>${s.valid_used?"Válida já utilizada":(!s.practice_used?"Faça o teste primeiro":"Fazer tentativa válida")}</button>
  </div>
+ ${s.valid_finished?`<button id="myresult" class="result-link">Ver meu resultado</button>`:""}
  <p class="muted">30 perguntas • 7 segundos por pergunta • teste e válida usam perguntas diferentes.</p>
  <button id="logout" class="admin-link">Sair</button>
  </section></main>`;
  if(!s.practice_used) document.querySelector("#practice").onclick=()=>confirmStart("practice");
  if(!s.valid_used && s.practice_used) document.querySelector("#valid").onclick=()=>confirmStart("valid");
+ if(s.valid_finished) document.querySelector("#myresult").onclick=myResult;
  document.querySelector("#logout").onclick=home;
 }
 function confirmStart(mode){
@@ -127,38 +129,7 @@ async function finished(){
  try{
    const r=await rpc("quiz_result",{p_token:session.token});
    clearActiveAttempt();
-   const time=(Number(r.correct_time_ms||0)/1000).toFixed(2).replace(".",",");
-   const score=Number(r.score||0).toFixed(1).replace(".",",");
-   const maxScore=Number(r.max_score||45).toFixed(1).replace(".",",");
-   const review=r.review||[];
-
-   app.innerHTML=`<main class="shell"><section class="card result-card">
-    <div class="center"><div class="football">🏈</div><div class="eyebrow">TENTATIVA VÁLIDA CONCLUÍDA</div>
-    <h1>Seu resultado</h1><p class="lead">Seu resultado foi registrado. O ranking geral só será publicado quando todos terminarem.</p></div>
-    <div class="result-summary">
-      <div><strong>${score}</strong><span>pontos de ${maxScore}</span></div>
-      <div><strong>${r.correct_count}/${r.total}</strong><span>acertos</span></div>
-      <div><strong>${time}s</strong><span>tempo de desempate</span></div>
-    </div>
-    <div class="review-title"><h2>Revisão das respostas</h2><p class="muted">O tempo de desempate soma somente o tempo das respostas corretas.</p></div>
-    <div class="review-list">${review.map(item=>{
-      const chosen=item.chosen_index===null||item.chosen_index===undefined?null:Number(item.chosen_index);
-      const correct=Number(item.correct_index);
-      const chosenText=chosen===null?"Tempo esgotado":item.options[chosen];
-      const correctText=item.options[correct];
-      const diff=item.difficulty==="easy"?"Fácil":item.difficulty==="medium"?"Média":"Difícil";
-      const pts=Number(item.points||0).toFixed(1).replace(".",",");
-      const maxPts=Number(item.max_points||0).toFixed(1).replace(".",",");
-      return `<article class="review-item ${item.correct?"review-correct":"review-wrong"}">
-        <div class="review-head"><span>${item.correct?"✅":"❌"} ${item.number}. ${diff}</span><strong>${pts}/${maxPts} pt</strong></div>
-        <h3>${esc(item.question)}</h3>
-        <p><b>Sua resposta:</b> ${chosen===null?"Tempo esgotado":`${String.fromCharCode(65+chosen)} — ${esc(chosenText)}`}</p>
-        ${item.correct?"":`<p><b>Resposta correta:</b> ${String.fromCharCode(65+correct)} — ${esc(correctText)}</p>`}
-      </article>`;
-    }).join("")}</div>
-    <button id="home">Tela inicial</button>
-   </section></main>`;
-   document.querySelector("#home").onclick=home;
+   renderValidResult(r);
  }catch(e){
    app.innerHTML=`<main class="shell"><section class="card center"><div class="eyebrow">TENTATIVA VÁLIDA CONCLUÍDA</div>
    <h1>Resultado registrado.</h1><p class="lead">Não consegui carregar a revisão agora, mas sua tentativa foi salva.</p>
@@ -167,6 +138,50 @@ async function finished(){
    document.querySelector("#home").onclick=home;
  }
 }
+function renderValidResult(r){
+ const time=(Number(r.correct_time_ms||0)/1000).toFixed(2).replace(".",",");
+ const score=Number(r.score||0).toFixed(1).replace(".",",");
+ const maxScore=Number(r.max_score||45).toFixed(1).replace(".",",");
+ const review=r.review||[];
+
+ app.innerHTML=`<main class="shell"><section class="card result-card">
+  <div class="center"><div class="football">🏈</div><div class="eyebrow">TENTATIVA VÁLIDA CONCLUÍDA</div>
+  <h1>Seu resultado</h1><p class="lead">Seu resultado foi registrado. O ranking geral só será publicado quando todos terminarem.</p></div>
+  <div class="result-summary">
+    <div><strong>${score}</strong><span>pontos de ${maxScore}</span></div>
+    <div><strong>${r.correct_count}/${r.total}</strong><span>acertos</span></div>
+    <div><strong>${time}s</strong><span>tempo de desempate</span></div>
+  </div>
+  <div class="review-title"><h2>Revisão das respostas</h2><p class="muted">O tempo de desempate soma somente o tempo das respostas corretas.</p></div>
+  <div class="review-list">${review.map(item=>{
+    const chosen=item.chosen_index===null||item.chosen_index===undefined?null:Number(item.chosen_index);
+    const correct=Number(item.correct_index);
+    const chosenText=chosen===null?"Tempo esgotado":item.options[chosen];
+    const correctText=item.options[correct];
+    const diff=item.difficulty==="easy"?"Fácil":item.difficulty==="medium"?"Média":"Difícil";
+    const pts=Number(item.points||0).toFixed(1).replace(".",",");
+    const maxPts=Number(item.max_points||0).toFixed(1).replace(".",",");
+    return `<article class="review-item ${item.correct?"review-correct":"review-wrong"}">
+      <div class="review-head"><span>${item.correct?"✅":"❌"} ${item.number}. ${diff}</span><strong>${pts}/${maxPts} pt</strong></div>
+      <h3>${esc(item.question)}</h3>
+      <p><b>Sua resposta:</b> ${chosen===null?"Tempo esgotado":`${String.fromCharCode(65+chosen)} — ${esc(chosenText)}`}</p>
+      ${item.correct?"":`<p><b>Resposta correta:</b> ${String.fromCharCode(65+correct)} — ${esc(correctText)}</p>`}
+    </article>`;
+  }).join("")}</div>
+  <button id="home">Tela inicial</button>
+ </section></main>`;
+ document.querySelector("#home").onclick=home;
+}
+
+async function myResult(){
+ try{
+   const r=await rpc("quiz_my_result",{p_name:session.name,p_pin:session.pin});
+   renderValidResult(r);
+ }catch(e){
+   alert("Não consegui carregar seu resultado: "+e.message);
+ }
+}
+
 async function ranking(){
  try{
   const result=await rpc("quiz_ranking");
